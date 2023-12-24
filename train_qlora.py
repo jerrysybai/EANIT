@@ -17,11 +17,13 @@ from torch.nn import functional as F
 import numpy as np
 
 from component.collator import SFTDataCollator
-from component.dataset import SFTDataset, ChatGLM2SFTDataset
+from component.dataset import  ChatGLM2SFTDataset
+from utils.dataset_new import SFTDataset, SFTDataset_all
 from component.argument import QLoRAArguments
 from component.trainer import LoRATrainer
 from component.loss import TargetLMLoss
 from component.llama_model import Llama_seq2seq
+from utils.metrics import get_metrics
 
 
 def verify_model_dtype(model):
@@ -96,24 +98,6 @@ def setup_everything():
     return args, training_args
 
 
-def NEFTune(model, noise_alpha=5):
-    def noised_embed(orig_embed, noise_alpha):
-        def new_func(x):
-            # during training, we add noise to the embedding
-            # during generation, we don't add noise to the embedding
-            if model.training:
-                embed_init = orig_embed(x)
-                dims = torch.tensor(embed_init.size(1) * embed_init.size(2))
-                mag_norm = noise_alpha/torch.sqrt(dims)
-                return embed_init + torch.zeros_like(embed_init).uniform_(-mag_norm, mag_norm)
-            else:
-                return orig_embed(x)
-        return new_func
-    ##### NOTE: this is for a LLaMA model ##### 
-    ##### For a different model, you need to change the attribute path to the embedding #####
-    model.base_model.model.model.embed_tokens.forward = noised_embed(model.base_model.model.base_model.embed_tokens, noise_alpha)
-    return model
-
 def init_components(args, training_args):
     """
     初始化各个组件
@@ -171,20 +155,9 @@ def init_components(args, training_args):
     if model.config.model_type == 'chatglm':
         train_dataset = ChatGLM2SFTDataset(args.train_file, tokenizer, args.max_seq_length)
     else:
-        # train_dataset = SFTDataset(args.train_file, tokenizer, args.max_seq_length, args.max_seq_length, 50, path = "data/RE")
-        train_dataset = SFTDataset(args.train_file, tokenizer, args.max_seq_length)
-        eval_dataset = SFTDataset(args.eval_file, tokenizer, args.max_seq_length)
+        train_dataset = SFTDataset(args.train_file, tokenizer, args.max_seq_length, type = args.task)
+        eval_dataset = SFTDataset(args.train_file, tokenizer, args.max_seq_length, is_train = False, type = args.task)
     data_collator = SFTDataCollator(tokenizer, args.max_seq_length)
-
-    # # 部分tokenizer没有pad_token_id
-    # if tokenizer.pad_token_id is None:
-    #     tokenizer.pad_token_id = tokenizer.unk_token_id
-    # # 部分tokenizer的pad_token_id与eos_token_id相同，如InternLM，会导致无法计算eos_token_id的loss。将pad_token_id设为unk_token_id
-    # if tokenizer.pad_token_id == tokenizer.eos_token_id and tokenizer.unk_token_id is not None:
-    #     tokenizer.pad_token_id = tokenizer.unk_token_id
-    # # 如果两者相同，模型训练时不会计算eos_token_id的loss
-    # if tokenizer.pad_token_id == tokenizer.eos_token_id:
-    #     raise Exception('pad_token_id should not be equal to eos_token_id')
 
     # casts all the non int8 modules to full precision (fp32) for stability
     model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=training_args.gradient_checkpointing)
@@ -210,65 +183,7 @@ def init_components(args, training_args):
     # 初始化损失函数
     loss_func = TargetLMLoss(ignore_index=-100)
 
-    def compute_metrics(pred_o):
-        
-        labels = np.array(pred_o.label_ids)
-        preds = np.array(pred_o.predictions)
-        labels = np.where(labels>0, labels, 0)
-        preds = np.where(preds>0, preds, 0)
-        label_all = []
-        pred_all = []
-        cor_tot = 0
-        for i in range(preds.shape[0]):
-            pred = preds[i].tolist()
-            label = labels[i].tolist()
-            response = tokenizer.decode(pred)
-            response = response.strip().replace(tokenizer.eos_token, "").replace("<unk>", "").strip().split("; ")
-            label = tokenizer.decode(label)
-            label = label.strip().replace(tokenizer.eos_token, "").replace("<unk>", "").strip().split("; ")
-            
-            labels_sub = []
-            preds_sub = []
-            
-            for l in label:
-                if l != "None":
-                    labels_sub.append(l)
-                if l == "None":
-                    label_all.append((i,"None","None"))
-                    continue
-                l_list = l.split(": ")
-                if len(l_list) != 2:
-                    continue
-                label_all.append((i,l_list[0].replace(" ", ""),l_list[1].replace(" ", "")))
-            for r in response:
-                if r != "None":
-                    preds_sub.append(r)
-                if r == "None":
-                    pred_all.append((i,"None","None"))
-                    continue
-                r_list = r.split(": ")
-                if len(r_list) != 2:
-                    continue
-                if (i,r_list[0].replace(" ", ""),r_list[1].replace(" ", "")) not in pred_all:
-                    pred_all.append((i,r_list[0].replace(" ", ""),r_list[1].replace(" ", "")))
-            for pre_label in preds_sub:
-                for it_label in labels_sub:
-                    if pre_label.find(it_label) != -1:
-                        cor_tot += 1
-                        
-        ner_tot_recall = len(label_all)
-        tot_pred_tot = len(pred_all)
-        
-        cor_tot = 0
-        for item in pred_all:
-            if item in label_all:
-                cor_tot += 1
-        p = cor_tot / tot_pred_tot if tot_pred_tot > 0 else 0 
-        r = cor_tot / ner_tot_recall 
-        f1_tot = 2 * (p * r) / (p + r) if cor_tot > 0 else 0.0
-        ad = {'f1':  f1_tot, 'precision': p, 'recall': r}
-        print(ad)    
-        return {'f1':  f1_tot, 'precision': p, 'recall': r}
+    compute_metrics = get_metrics(tokenizer, args.task)
 
     # 初始化Trainer
     trainer = LoRATrainer(

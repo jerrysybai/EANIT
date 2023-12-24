@@ -31,7 +31,6 @@ class TargetLMLoss(Loss):
         input_ids = inputs['input_ids']
         attention_mask = inputs['attention_mask']
         target_mask = inputs['target_mask']
-        promot_mask = inputs['promot_mask_batch']
         if generation_config is None:
             # 模型前馈预测
             outputs = model(input_ids=input_ids, attention_mask=attention_mask, return_dict=True)

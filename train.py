@@ -11,10 +11,12 @@ import torch
 from transformers import AutoTokenizer
 from transformers import AutoModelForCausalLM
 from component.collator import SFTDataCollator
-from component.dataset import SFTDataset, ChatGLM2SFTDataset
+from component.dataset import  ChatGLM2SFTDataset
 from component.argument import CustomizedArguments
 from component.trainer import Trainer
 from component.loss import TargetLMLoss
+from utils.metrics import get_metrics
+from utils.dataset_new import SFTDataset
 
 
 def setup_everything():
@@ -92,17 +94,22 @@ def init_components(args, training_args):
     if model.config.model_type == 'chatglm':
         train_dataset = ChatGLM2SFTDataset(args.train_file, tokenizer, args.max_seq_length)
     else:
-        train_dataset = SFTDataset(args.train_file, tokenizer, args.max_seq_length)
+        train_dataset = SFTDataset(args.train_file, tokenizer, args.max_seq_length, type = args.task)
+        eval_dataset = SFTDataset(args.train_file, tokenizer, args.max_seq_length, is_train = False, type = args.task)
     data_collator = SFTDataCollator(tokenizer, args.max_seq_length)
 
+    
+    compute_metrics = get_metrics(tokenizer, args.task)
     # 初始化Trainer
     trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset,
-        # tokenizer=tokenizer,
+        eval_dataset = eval_dataset,
+        tokenizer=tokenizer,
         data_collator=data_collator,
-        compute_loss=loss_func
+        compute_loss=loss_func,
+        compute_metrics = compute_metrics,
     )
     return trainer
 

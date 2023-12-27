@@ -1,10 +1,10 @@
 {
-    "output_dir": "output/llama_kbp37_noise",
+    "output_dir": "output/llama_agnews_class",
     "model_name_or_path": "/home/lqb/llama-7B",
-    "train_file": "/home/lqb/llama_RE/data/RE/kbp37",
+    "train_file": "data/tex_class/ag_news",
     "eval_file":"data/test/NER/CoNLL 2003_sample_15000_test.jsonl",
-    "num_train_epochs": 10,
-    "per_device_train_batch_size": 8,
+    "num_train_epochs": 5,
+    "per_device_train_batch_size": 24,
     "per_device_eval_batch_size": 8,
     "gradient_accumulation_steps": 2,
     "learning_rate": 1e-4,
@@ -18,7 +18,7 @@
     "lora_alpha": 16,
     "lora_dropout": 0.05,
     "dataset": "WikiANN",
-    "task": "RE",
+    "task": "TXT_class",
 
     "gradient_checkpointing": true,
     "disable_tqdm": false,

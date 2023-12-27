@@ -1,6 +1,8 @@
 import numpy as np
+from sklearn.metrics import f1_score, precision_score, recall_score
 
 def get_metrics(tokenizer, type):
+    
     
     def compute_metrics_re(pred_o):
         labels = np.array(pred_o.label_ids)
@@ -115,4 +117,43 @@ def get_metrics(tokenizer, type):
         print(ad)    
         return {'f1':  f1_tot, 'precision': p, 'recall': r}
     
-    return compute_metrics_re if type=="RE" else compute_metrics_ner
+    def compute_metrics_re_class(pred_o):
+        labels = np.array(pred_o.label_ids)
+        preds = np.array(pred_o.predictions)
+        labels = np.where(labels>0, labels, 0)
+        preds = np.where(preds>0, preds, 0)
+        label_all = []
+        pred_all = []
+        label2id = {}
+        for i in range(preds.shape[0]):
+            pred = preds[i].tolist()
+            label = labels[i].tolist()
+            response = tokenizer.decode(pred)
+            response = response.strip().replace(tokenizer.eos_token, "").replace("<unk>", "").strip()
+            label = tokenizer.decode(label)
+            label = label.strip().replace(tokenizer.eos_token, "").replace("<unk>", "").strip()
+            if label not in label2id:
+                label2id[label] = len(label2id)
+            label_all.append(label)
+            pred_all.append(response)
+            
+        for i in range(len(label_all)):
+            label_all[i] = label2id[label_all[i]]
+            if pred_all[i] not in label2id:  
+                pred_all[i] = 0 if label_all[i]!=0 else 1
+            else:
+                pred_all[i] = label2id[pred_all[i]]
+        f1 = f1_score(label_all, pred_all, average='micro')
+        precision = precision_score(label_all, pred_all, average='micro')
+        recall = recall_score(label_all, pred_all, average='micro')
+        ad = {'f1':  f1, 'precision': precision, 'recall': recall}
+        print(ad)    
+        return {'f1':  f1, 'precision': precision, 'recall': recall}
+    
+    if type=="RE":
+        return compute_metrics_re
+    elif type == "NER":
+        return compute_metrics_ner
+    elif type == "RE_class" or type == "TXT_class":
+        return compute_metrics_re_class       
+    

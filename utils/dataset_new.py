@@ -9,49 +9,26 @@ from transformers import AutoTokenizer, BitsAndBytesConfig
 
 global_instructions = {
     "NER":"Please list all entity words in the text that fit the category.Output format is \"type1: word1; type2: word2\". \n",
-    "RE":"Given a phrase that describes the relationship between two words, extract the words and the lexical relationship between them. The output format should be \"relation1: word1, word2; relation2: word3, word4\". \n"
+    "RE":"Given a phrase that describes the relationship between two words, extract the words and the lexical relationship between them. The output format should be \"relation1: word1, word2; relation2: word3, word4\". \n",
+    "RE_class": "Find the relationship between {0} and {1} in text from following options? \n",
+    "TXT_class": "Filter text types from the following options. \n",
 }
 
 Noise_op = ["cut", "cut mix", "random pad", "replace", "opposit"]
 
-class SFTDataset(Dataset):
-    # 读取一个数据集下的数据
-    # 
-    def __init__(self, path, tokenizer, max_seq_length, noise_tp = "cut", is_train = True, type = "NER"):
-        self.tokenizer = tokenizer
-        self.bos_token_id = tokenizer.bos_token_id
-        self.eos_token_id = tokenizer.eos_token_id
-        self.train_path = os.path.join(path, 'train.json')
-        self.test_path = os.path.join(path, 'test.json')
-        self.label_path = os.path.join(path, 'labels.json')
-        self.noise_tp = noise_tp
-        self.max_len = max_seq_length
-        logger.info('Loading data: {}'.format(path))
-        if is_train:
-            instances, labels = self._load_dataset(self.train_path, self.label_path)
-        else:
-            instances, labels = self._load_dataset(self.test_path, self.label_path)
-        self.instruction = global_instructions[type]
-        self.noise_instruction = self.get_noise_instruction(self.instruction)
-        if type == "NER":
-            self.example = self.prepare_data_NER(instances, labels)
-        else:
-            self.example = self.prepare_data_RE(instances, labels)
-        logger.info("there are {} data in dataset".format(len(self.example)))
-        self.padding = True
-    
-    def get_noise_instruction(self, instruction):
-        return instruction
 
-    
-    def _load_dataset(self, dataset_path, labels_path):
-        with open(dataset_path, encoding="utf-8") as task_f:
-            s = task_f.read()
-            instances = json.loads(s)
-        with open(labels_path, encoding="utf-8") as labels_f:
-            labels = json.load(labels_f)
-        return instances, labels
-    
+class Data_prepare:
+    def __init__(self, type, instruction, noise_instruction) -> None:
+        self.type = type
+        self.instruction = instruction
+        self.noise_instruction = noise_instruction
+        
+    def process(self) -> None:
+        if self.type == None :
+            pass
+        else:
+            getattr(self, "prepare_data_" + self.type)()
+        
     def prepare_data_NER(self, data_list, labels):
         example = []
         labels_str = ', '.join(labels)
@@ -124,6 +101,121 @@ class SFTDataset(Dataset):
                     "noise_instruction":noise_instruction
                 })
         return example
+    
+    def prepare_data_RE_class(self, data_list, labels):
+        labels.append("None")
+        example = []
+        labels_str = ', '.join(labels)
+        for idx, instance in enumerate(data_list ):
+            
+            relation_pairs = []
+            ground_truth_pairs = []
+            
+            for relation in instance['relations']:
+                if relation['type'] == '':
+                    ground_truth_pairs.append([relation['head']['name'], 'NA', relation['tail']['name']])
+                    continue
+                relation_pair = [relation['head']['name'], relation['type'], relation['tail']['name']]
+                ground_truth_pairs.append(relation_pair)
+                relation_pairs.append(relation_pair)
+                
+            assert len(relation_pairs) == 1
+
+            if len(relation_pairs) == 1:
+                label = ' ' + relation_pairs[0][1]
+            else:
+                label = ' None'
+            # get instruction  
+            instruction = self.instruction
+            noise_instruction = self.noise_instruction   
+            instruction = instruction.format(relation_pairs[0][1], relation_pairs[0][2])
+            noise_instruction = noise_instruction.format(relation_pairs[0][0], relation_pairs[0][2])
+            instruction += "Option: " + labels_str + " \n" + "Text: " + "{0}" + " \n" + "Answer:"
+            noise_instruction += "Option: " + labels_str + " \n" + "Text: " + "{0}" + " \n" + "Answer:"
+            
+            # if len(ground_truth_pairs) == 1:
+            #     ground_truth = ' ' + relation_pairs[0][0]
+            # else:
+            #     logger.error("******Error item: {}******".format(instance))
+            #     raise Exception('Dataset Error:{}, No ground truth!'.format("dataset_name"))
+            
+            example.append({
+                    "id": str(idx),
+                    "sentence": instance['sentence'],
+                    "label": label,
+                    "ground_truth": label,
+                    "instruction": instruction,
+                    "noise_instruction":noise_instruction
+                })
+        return example
+    
+    def prepare_data_TXT_class(self, data_list, labels):
+        example = []
+        labels_str = ', '.join(labels)
+        instruction = self.instruction
+        instruction += "Option: " + labels_str + " \n" + "Text: " + "{0}" + " \n" + "Answer:"
+        noise_instruction = self.noise_instruction
+        noise_instruction += "Option: " + labels_str + " \n" + "Text: " + "{0}" + " \n" + "Answer:"
+        for idx, instance in enumerate(data_list ):
+            label = ' ' + instance['label_text']
+            example.append({
+                    "id": str(idx),
+                    "sentence": instance['text'],
+                    "label": label,
+                    "ground_truth": label,
+                    "instruction": instruction,
+                    "noise_instruction":noise_instruction
+                })
+        return example
+        
+
+class SFTDataset(Dataset):
+    # 读取一个数据集下的数据
+    # 
+    def __init__(self, path, tokenizer, max_seq_length, noise_tp = "cut", is_train = True, type = "NER"):
+        self.type = type
+        self.tokenizer = tokenizer
+        self.bos_token_id = tokenizer.bos_token_id
+        self.eos_token_id = tokenizer.eos_token_id
+        self.train_path = os.path.join(path, 'train.json')
+        self.test_path = os.path.join(path, 'test.json')
+        self.label_path = os.path.join(path, 'labels.json')
+        self.noise_tp = noise_tp
+        self.max_len = max_seq_length
+        logger.info('Loading data: {}'.format(path))
+        if is_train:
+            instances, labels = self._load_dataset(self.train_path, self.label_path)
+        else:
+            instances, labels = self._load_dataset(self.test_path, self.label_path)
+        self.instruction = global_instructions[type]
+        self.noise_instruction = self.get_noise_instruction(self.instruction)
+        self.prepare_data = Data_prepare(type, self.instruction, self.noise_instruction)
+        self.example = getattr(self.prepare_data, "prepare_data_" + type)(instances, labels)
+        # if type == "NER":
+        #     self.example = self.prepare_data_NER(instances, labels)
+        # else:
+        #     self.example = self.prepare_data_RE(instances, labels)
+        logger.info("there are {} data in dataset".format(len(self.example)))
+        self.padding = True
+    
+    def get_noise_instruction(self, instruction):
+        return instruction
+
+    
+    def _load_dataset(self, dataset_path, labels_path):
+        with open(dataset_path, encoding="utf-8") as task_f:
+            if self.type == "TXT_class":
+                lines = task_f.readlines()
+                instances = []
+                for line in lines:
+                    instances.append(json.loads(line))
+            else:
+                s = task_f.read()
+                instances = json.loads(s)
+        with open(labels_path, encoding="utf-8") as labels_f:
+            labels = json.load(labels_f)
+        return instances, labels
+    
     
     def __len__(self):
         return len(self.example)
@@ -201,6 +293,7 @@ class SFTDataset_all(SFTDataset):
         self.noise_tp = noise_tp
         self.instruction = global_instructions[type]
         self.noise_instruction = self.get_noise_instruction(self.instruction)
+        self.prepare_data = Data_prepare(type, self.instruction, self.noise_instruction)
         self.example = []
         path_all = os.listdir(path)
         for data_set in path_all[:]:
@@ -214,10 +307,11 @@ class SFTDataset_all(SFTDataset):
                 instances, labels = self._load_dataset(train_path, label_path)
             else:
                 instances, labels = self._load_dataset(test_path, label_path)
-            if type == "NER":
-                self.example += self.prepare_data_NER(instances, labels)
-            else:
-                self.example += self.prepare_data_RE(instances, labels)
+            self.example += getattr(self.prepare_data, "prepare_data_" + type)(instances, labels)
+            # if type == "NER":
+            #     self.example += self.prepare_data_NER(instances, labels)
+            # else:
+            #     self.example += self.prepare_data_RE(instances, labels)
             logger.info("there are {} data in dataset".format(len(self.example)))
         self.padding = True
            

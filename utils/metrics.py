@@ -146,11 +146,14 @@ def get_metrics(tokenizer, type):
         f1 = f1_score(label_all, pred_all, average='micro')
         precision = precision_score(label_all, pred_all, average='micro')
         recall = recall_score(label_all, pred_all, average='micro')
-        ad = {'f1':  f1, 'precision': precision, 'recall': recall}
+        f1_m = f1_score(label_all, pred_all, average='macro')
+        precision_m = precision_score(label_all, pred_all, average='macro')
+        recall_m = recall_score(label_all, pred_all, average='macro')
+        ad = {'micro-f1':  f1, 'micro-precision': precision, 'micro-recall': recall, 'macro-f1':  f1_m, 'macro-precision': precision_m, 'macro-recall': recall_m}
         print(ad)    
-        return {'f1':  f1, 'precision': precision, 'recall': recall}
+        return {'micro-f1':  f1, 'micro-precision': precision, 'micro-recall': recall, 'macro-f1':  f1_m, 'macro-precision': precision_m, 'macro-recall': recall_m}
     
-    if type=="RE":
+    if type=="RE" or type == "ABSA":
         return compute_metrics_re
     elif type == "NER":
         return compute_metrics_ner

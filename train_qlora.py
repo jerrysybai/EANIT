@@ -24,6 +24,7 @@ from component.trainer import LoRATrainer
 from component.loss import TargetLMLoss
 from component.llama_model import Llama_seq2seq
 from utils.metrics import get_metrics
+from utils.NEFT import AT_llama
 
 
 def verify_model_dtype(model):
@@ -117,21 +118,38 @@ def init_components(args, training_args):
     device_map = {'': local_rank}
 
     # 加载模型
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model_name_or_path,
-        device_map=device_map,
-        load_in_4bit=True,
-        torch_dtype=torch.float16,
-        quantization_config=BitsAndBytesConfig(
+    if args.add_nosie:
+        model = AT_llama.from_pretrained(
+            args.model_name_or_path,
+            device_map=device_map,
             load_in_4bit=True,
-            bnb_4bit_compute_dtype=torch.float16,
-            bnb_4bit_use_double_quant=True,
-            bnb_4bit_quant_type="nf4",
-            llm_int8_threshold=6.0,
-            llm_int8_has_fp16_weight=False,
-        ),
-        trust_remote_code=True,
-    )
+            torch_dtype=torch.float16,
+            quantization_config=BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.float16,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4",
+                llm_int8_threshold=6.0,
+                llm_int8_has_fp16_weight=False,
+            ),
+            trust_remote_code=True,
+        )
+    else:
+        model = AutoModelForCausalLM.from_pretrained(
+            args.model_name_or_path,
+            device_map=device_map,
+            load_in_4bit=True,
+            torch_dtype=torch.float16,
+            quantization_config=BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.float16,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4",
+                llm_int8_threshold=6.0,
+                llm_int8_has_fp16_weight=False,
+            ),
+            trust_remote_code=True,
+        )
     
     # 加载tokenzier
     tokenizer = AutoTokenizer.from_pretrained(

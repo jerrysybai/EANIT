@@ -12,6 +12,7 @@ global_instructions = {
     "RE":"Given a phrase that describes the relationship between two words, extract the words and the lexical relationship between them. The output format should be \"relation1: word1, word2; relation2: word3, word4\". \n",
     "RE_class": "Find the relationship between {0} and {1} in text from following options? \n",
     "TXT_class": "Filter text types from the following options. \n",
+    "ABSA": "For a given text, identify its emotional polarity and association with specified aspects, extract the words and the emotional between them. The output format should be \"emotional1: word1, word2; emotional2: word3, word4\". \n",
 }
 
 Noise_op = ["cut", "cut mix", "random pad", "replace", "opposit"]
@@ -60,6 +61,9 @@ class Data_prepare:
                     "noise_instruction":noise_instruction
                 })
         return example
+    
+    def prepare_data_ABSA(self, data_list, labels):
+        return self.prepare_data_RE(data_list, labels)
     
     def prepare_data_RE(self, data_list, labels):
         labels.append("None")
@@ -191,10 +195,6 @@ class SFTDataset(Dataset):
         self.noise_instruction = self.get_noise_instruction(self.instruction)
         self.prepare_data = Data_prepare(type, self.instruction, self.noise_instruction)
         self.example = getattr(self.prepare_data, "prepare_data_" + type)(instances, labels)
-        # if type == "NER":
-        #     self.example = self.prepare_data_NER(instances, labels)
-        # else:
-        #     self.example = self.prepare_data_RE(instances, labels)
         logger.info("there are {} data in dataset".format(len(self.example)))
         self.padding = True
     

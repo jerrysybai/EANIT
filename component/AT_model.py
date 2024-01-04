@@ -77,18 +77,18 @@ class AdvMaskedLmLoss(FairseqCriterion):
             targets.view(-1),
             reduction='sum',
             ignore_index=self.padding_idx,
-        )
+        )   #计算正常样本的损失
         if self.args.adv_opt > 0 and self.training:
             embed = extra['inner_states'][self.args.prob_n_layer]
             noise = embed.data.new(embed.size()).normal_(0, 1) * self.args.noise_var
-            noise.requires_grad_()
-            newembed = embed.data.detach() + noise
+            noise.requires_grad_() #噪声向量初始化
+            newembed = embed.data.detach() + noise #构造对抗样本
             adv_logits, _ = model(**sample['net_input'], masked_tokens=masked_tokens, task_id=1, embed=newembed, player=0)
-            adv_loss = KL(adv_logits, logits.detach(), reduction="batchmean")
+            adv_loss = KL(adv_logits, logits.detach(), reduction="batchmean") #计算对抗样本损失，这里用的是KL_散度
             # line 5, g_adv
-            delta_grad, = torch.autograd.grad(adv_loss, noise, only_inputs=True)
+            delta_grad, = torch.autograd.grad(adv_loss, noise, only_inputs=True) #对噪声向量计算梯度
             norm = delta_grad.norm()
-            if (torch.isnan(norm) or torch.isinf(norm)):
+            if (torch.isnan(norm) or torch.isinf(norm)):  #会出现nan值的处理，这里我觉得很有必要，因为我自己搞的时候就发现很容易出现nan值
                 # skim this batch
                 logging_output = {
                     'loss': utils.item(loss.data) if reduce else loss.data,
@@ -99,12 +99,12 @@ class AdvMaskedLmLoss(FairseqCriterion):
                 }
                 return loss, sample_size, logging_output
             # line 6 inner sum
-            noise = noise + delta_grad * self.args.adv_step_size
+            noise = noise + delta_grad * self.args.adv_step_size  #更新噪声向量
             # line 6 projection
             noise = self.adv_project(noise, norm_type=self.args.project_norm_type, eps=self.args.noise_gamma)
             newembed = embed.data.detach() + noise
             newembed = newembed.detach()
-            adv_logits, _ = model(**sample['net_input'], masked_tokens=masked_tokens, task_id=1, embed=newembed, player=0)
+            adv_logits, _ = model(**sample['net_input'], masked_tokens=masked_tokens, task_id=1, embed=newembed, player=0) #再走一遍网络，一共走三遍
             # line 8 symmetric KL
             adv_loss_f = KL(adv_logits, logits.detach())
             adv_loss_b = KL(logits, adv_logits.detach())

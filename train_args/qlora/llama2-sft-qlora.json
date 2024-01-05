@@ -1,5 +1,5 @@
 {
-    "output_dir": "output/llama_conll03_noise",
+    "output_dir": "output/llama_CoNLL2003_noise",
     "model_name_or_path": "/home/lqb/llama-7B",
     "train_file": "data/NER/CoNLL2003",
     "eval_file":"data/test/NER/CoNLL 2003_sample_15000_test.jsonl",

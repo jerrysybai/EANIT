@@ -68,7 +68,8 @@ def find_all_linear_names(model):
     """
     找出所有全连接层，为所有全连接添加adapter
     """
-    cls = bnb.nn.Linear4bit
+    # cls = bnb.nn.Linear4bit
+    cls = bnb.nn.Linear8bitLt
     lora_module_names = set()
     for name, module in model.named_modules():
         if isinstance(module, cls):
@@ -122,10 +123,10 @@ def init_components(args, training_args):
         model = AT_llama.from_pretrained(
             args.model_name_or_path,
             device_map=device_map,
-            load_in_4bit=True,
+            # load_in_4bit=True,
             torch_dtype=torch.float16,
             quantization_config=BitsAndBytesConfig(
-                load_in_4bit=True,
+                load_in_8bit=True,
                 bnb_4bit_compute_dtype=torch.float16,
                 bnb_4bit_use_double_quant=True,
                 bnb_4bit_quant_type="nf4",

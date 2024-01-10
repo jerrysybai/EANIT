@@ -28,4 +28,8 @@ class QLoRAArguments:
     lora_dropout: Optional[float] = field(default=0.05, metadata={"help": "lora dropout"})
     add_nosie: Optional[bool] = field(default=False, metadata={"help": "add noise"})
     task: Optional[str] = field(default="", metadata={"help": "the task name RE/NER"})
-
+    noise_var: Optional[float] = field(default=1e-5, metadata={"help": "lora rank"})
+    noise_gamma: Optional[float] = field(default=1e-6, metadata={"help": "1e-4 (default), eps for adversarial copy training."})
+    adv_step_size: Optional[float] = field(default=1e-3, metadata={"help": "1 (default), perturbation size for adversarial training."})
+    project_norm_type: Optional[str] = field(default="inf", metadata={"help": "the task name RE/NER"})
+    useKL: Optional[bool] = field(default=False, metadata={"help": "use KL"})

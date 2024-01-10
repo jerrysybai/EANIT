@@ -20,7 +20,7 @@ class SFTDataCollator(object):
         batch_max_labellen = min(max(label_len), self.max_seq_length)
         # batch_max_len = self.max_seq_length
 
-        input_ids_batch, attention_mask_batch, target_mask_batch, labels_batch, test_batch = [], [], [], [], []
+        input_ids_batch, attention_mask_batch, target_mask_batch, labels_batch, test_batch, normal_pos_batch, noise_pos_batch = [], [], [], [], [], [], []
         # truncate and padding
         for x in batch:
             input_ids = x['input_ids']
@@ -28,7 +28,14 @@ class SFTDataCollator(object):
             target_mask = x['target_mask']
             test_input = x["test_input"]
             label_ids = x["label_ids"]
-
+            mention_pos = x["mention_pos"]
+            
+            normal_pos = [mention_pos[0] + i for i in range(len(label_ids))][:150]
+            noise_pos = [mention_pos[1] + i for i in range(len(label_ids))][:150]
+            pospad_len = 150 - len(normal_pos)
+            normal_pos = normal_pos + [normal_pos[-1]] * pospad_len
+            noise_pos = noise_pos + [noise_pos[-1]] * pospad_len
+ 
             padding_len = batch_max_len - len(input_ids)
             test_padlen = batch_max_testlen - len(test_input)
             label_padlen = batch_max_labellen - len(label_ids)
@@ -53,6 +60,8 @@ class SFTDataCollator(object):
             target_mask_batch.append(target_mask)
             labels_batch.append(label_ids)
             test_batch.append(test_input)
+            normal_pos_batch.append(normal_pos)
+            noise_pos_batch.append(noise_pos)
 
         # 将list转换为tensor，得到最终的的模型输入
         input_ids_batch = torch.tensor(input_ids_batch, dtype=torch.long)
@@ -60,6 +69,8 @@ class SFTDataCollator(object):
         target_mask_batch = torch.tensor(target_mask_batch, dtype=torch.long)
         labels_batch = torch.tensor(labels_batch, dtype=torch.long)
         test_batch = torch.tensor(test_batch, dtype=torch.long)
+        normal_batch = torch.tensor(normal_pos_batch, dtype=torch.long)
+        noise_batch = torch.tensor(noise_pos_batch, dtype=torch.long)
         
         inputs = {
             'input_ids': input_ids_batch,
@@ -67,5 +78,7 @@ class SFTDataCollator(object):
             'target_mask': target_mask_batch,
             'test_labels':labels_batch,
             'test_ids':test_batch,
+            'noise_pos' : noise_batch,
+            'normal_pos': normal_batch
         }
         return inputs

@@ -278,7 +278,8 @@ class SFTDataset(Dataset):
             'noise_att_mask': noise_att_mask,
             'noise_mask': noise_mask,
             'test_input': test_input_ids,
-            'label_ids': tokenized_label
+            'label_ids': tokenized_label,
+            'mention_pos':(len(tokenized_input)-1, len(tokenized_noise)-1)
         }
         return inputs
 

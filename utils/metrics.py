@@ -83,7 +83,7 @@ def get_metrics(tokenizer, type):
             label = label.strip().replace(tokenizer.eos_token, "").replace("<unk>", "").strip().split("; ")
             for l in label:
                 if l != "None":
-                    labels_sub.append(l)
+                    labels_sub.append((i,l))
                 if l == "None":
                     label_all.append((i,"None","None"))
                     continue
@@ -93,7 +93,7 @@ def get_metrics(tokenizer, type):
                 label_all.append((i,l_list[0].replace(" ", ""),l_list[1].replace(" ", "")))
             for r in response:
                 if r != "None":
-                    preds_sub.append(r)
+                    preds_sub.append((i,r))
                 if r == "None":
                     pred_all.append((i,"None","None"))
                     continue

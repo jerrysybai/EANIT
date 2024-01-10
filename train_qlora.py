@@ -113,10 +113,11 @@ def init_components(args, training_args):
     # if os.environ.get('LOCAL_RANK') is not None:
     #     local_rank = int(os.environ.get('LOCAL_RANK', '0'))
     #     device_map = {'': local_rank}
-
+    # p = os.environ.get('LOCAL_RANK')
     training_args.ddp_find_unused_parameters = False
     local_rank = int(os.environ.get('LOCAL_RANK', '0'))
     device_map = {'': local_rank}
+    device_map = "auto"
 
     # 加载模型
     if args.add_nosie:
@@ -200,7 +201,7 @@ def init_components(args, training_args):
     verify_model_dtype(model)
 
     # 初始化损失函数
-    loss_func = TargetLMLoss(ignore_index=-100)
+    loss_func = TargetLMLoss(args, ignore_index=-100)
 
     compute_metrics = get_metrics(tokenizer, args.task)
 

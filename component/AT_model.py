@@ -8,15 +8,14 @@ import math
 
 import torch
 import torch.nn.functional as F
+from torch import nn as nn
 
-from fairseq import utils
-from fairseq.criterions import FairseqCriterion, register_criterion
-
-def KL(input, target, reduction="sum"):
-    input = input.float()
-    target = target.float()
+def KL(input, target, noise_pos, normal_pos, reduction="sum"):
+    bsz, _, _ = input.shape
+    input = input[torch.arange(bsz).unsqueeze(-1), noise_pos[:, :]]
+    target = target[torch.arange(bsz).unsqueeze(-1), normal_pos[:, :]]
     loss = F.kl_div(F.log_softmax(input, dim=-1, dtype=torch.float32), F.softmax(target, dim=-1, dtype=torch.float32), reduction=reduction)
-    return loss
+    return loss, 0
 
 def SKL(logit, target, epsilon=1e-8):
     logit = logit.view(-1, logit.size(-1)).float()
@@ -29,14 +28,15 @@ def SKL(logit, target, epsilon=1e-8):
     return (p* (rp- ry) * 2).sum()
 
 
-@register_criterion('adv_masked_lm')
-class AdvMaskedLmLoss(FairseqCriterion):
+class AdvMaskedLmLoss(object):
     """
     Implementation for the loss used in masked language model (MLM) training.
     """
 
-    def __init__(self, args, task):
-        super().__init__(args, task)
+    def __init__(self, args, ignore_index):
+        self.args = args
+        self.ignore_index = ignore_index
+        self.loss_fn = nn.CrossEntropyLoss(ignore_index=ignore_index)
 
     def adv_project(self, grad, norm_type='inf', eps=1e-6):
         if norm_type == 'l2':
@@ -46,92 +46,63 @@ class AdvMaskedLmLoss(FairseqCriterion):
         else:
             direction = grad / (grad.abs().max(-1, keepdim=True)[0] + eps)
         return direction
+    
+    def get_loss(self, logits, target_mask, input_ids):
+        # 将labels中不属于target的部分，设为ignore_index，只计算target部分的loss
+        labels = torch.where(target_mask == 1, input_ids, self.ignore_index)
+        shift_logits = logits[..., :-1, :].contiguous()
+        shift_labels = labels[..., 1:].contiguous()
+        # Flatten the tokens
+        #计算正常样本的损失
+        loss = self.loss_fn(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+        return loss, labels
 
-    def forward(self, model, sample, reduce=True):
+    def __call__(self, model, inputs, reduce=True):
         """Compute the loss for the given sample.
         Returns a tuple with three elements:
         1) the loss
         2) the sample size, which is used as the denominator for the gradient
         3) logging outputs to display while training
         """
-        # compute MLM loss
-        masked_tokens = sample['target'].ne(self.padding_idx)
-        sample_size = masked_tokens.int().sum().item()
-        # (Rare case) When all tokens are masked, the model results in empty
-        # tensor and gives CUDA error.
-        if sample_size == 0:
-            masked_tokens = None
+        input_ids = inputs['input_ids']
+        attention_mask = inputs['attention_mask']
+        target_mask = inputs['target_mask']
+        normal_pos = inputs['normal_pos']
+        noise_pos = inputs['noise_pos']
+        #计算l(x,\thete)
+        outputs = model(input_ids=input_ids, attention_mask=attention_mask, return_dict=True)
+        logits = outputs["logits"] if isinstance(outputs, dict) else outputs[0]
 
-        logits, extra = model(**sample['net_input'], masked_tokens=masked_tokens, player=-1)
-        targets = model.get_targets(sample, [logits])
-
-        if sample_size != 0:
-            targets = targets[masked_tokens]
-
-        loss = F.nll_loss(
-            F.log_softmax(
-                logits.view(-1, logits.size(-1)),
-                dim=-1,
-                dtype=torch.float32,
-            ),
-            targets.view(-1),
-            reduction='sum',
-            ignore_index=self.padding_idx,
-        )   #计算正常样本的损失
-        if self.args.adv_opt > 0 and self.training:
-            embed = extra['inner_states'][self.args.prob_n_layer]
-            noise = embed.data.new(embed.size()).normal_(0, 1) * self.args.noise_var
+        #计算正常样本的损失
+        loss, labels = self.get_loss(logits, target_mask, input_ids)
+        
+        if self.args.add_nosie:
+            #构建对抗样本
+            embed = outputs['hidden_states']
+            dims = torch.tensor(input_ids.size(1) * 4096)
+            mag_norm = 10/torch.sqrt(dims)
+            noise = embed.data.new(embed.size()).normal_(-mag_norm, mag_norm) * self.args.noise_var
             noise.requires_grad_() #噪声向量初始化
-            newembed = embed.data.detach() + noise #构造对抗样本
-            adv_logits, _ = model(**sample['net_input'], masked_tokens=masked_tokens, task_id=1, embed=newembed, player=0)
-            adv_loss = KL(adv_logits, logits.detach(), reduction="batchmean") #计算对抗样本损失，这里用的是KL_散度
-            # line 5, g_adv
-            delta_grad, = torch.autograd.grad(adv_loss, noise, only_inputs=True) #对噪声向量计算梯度
+            adv_outputs = model(input_ids=input_ids, attention_mask=attention_mask, return_dict=True, noise_adv = noise)
+            adv_logits = adv_outputs["logits"] if isinstance(adv_outputs, dict) else adv_outputs[0]
+            adv_loss, _ = self.get_loss(adv_logits, target_mask.detach(), input_ids.detach()) if not self.args.useKL else KL(adv_logits, logits.detach(), noise_pos, normal_pos)
+            
+            adv_loss.backward()
+            delta_grad = noise.grad #对噪声向量计算梯度
             norm = delta_grad.norm()
+            model.zero_grad()
+            
             if (torch.isnan(norm) or torch.isinf(norm)):  #会出现nan值的处理，这里我觉得很有必要，因为我自己搞的时候就发现很容易出现nan值
                 # skim this batch
-                logging_output = {
-                    'loss': utils.item(loss.data) if reduce else loss.data,
-                    'nll_loss': utils.item(loss.data) if reduce else loss.data,
-                    'ntokens': sample['ntokens'],
-                    'nsentences': sample['nsentences'],
-                    'sample_size': sample_size,
-                }
-                return loss, sample_size, logging_output
-            # line 6 inner sum
-            noise = noise + delta_grad * self.args.adv_step_size  #更新噪声向量
+                return loss, outputs, labels
+            
+            new_noise = noise + (delta_grad / norm) * self.args.adv_step_size  #更新噪声向量
             # line 6 projection
-            noise = self.adv_project(noise, norm_type=self.args.project_norm_type, eps=self.args.noise_gamma)
-            newembed = embed.data.detach() + noise
-            newembed = newembed.detach()
-            adv_logits, _ = model(**sample['net_input'], masked_tokens=masked_tokens, task_id=1, embed=newembed, player=0) #再走一遍网络，一共走三遍
+            # new_noise = self.adv_project(noise, norm_type=self.args.project_norm_type, eps=self.args.noise_gamma)
+            adv_outputs = model(input_ids=input_ids, attention_mask=attention_mask, return_dict=True, noise_adv = new_noise) #再走一遍网络，一共走三遍
+            adv_logits = adv_outputs["logits"] if isinstance(adv_outputs, dict) else adv_outputs[0]
+            adv_loss, _ = self.get_loss(adv_logits, target_mask, input_ids) if not self.args.useKL else KL(adv_logits, logits.detach(), noise_pos, normal_pos)
             # line 8 symmetric KL
-            adv_loss_f = KL(adv_logits, logits.detach())
-            adv_loss_b = KL(logits, adv_logits.detach())
-            adv_loss = (adv_loss_f + adv_loss_b) * self.args.adv_alpha
-            loss = loss + adv_loss
-        logging_output = {
-            'loss': utils.item(loss.data) if reduce else loss.data,
-            'nll_loss': utils.item(loss.data) if reduce else loss.data,
-            'ntokens': sample['ntokens'],
-            'nsentences': sample['nsentences'],
-            'sample_size': sample_size,
-        }
-        return loss, sample_size, logging_output
-
-    @staticmethod
-    def aggregate_logging_outputs(logging_outputs):
-        """Aggregate logging outputs from data parallel training."""
-        loss = sum(log.get('loss', 0) for log in logging_outputs)
-        ntokens = sum(log.get('ntokens', 0) for log in logging_outputs)
-        nsentences = sum(log.get('nsentences', 0) for log in logging_outputs)
-        sample_size = sum(log.get('sample_size', 0) for log in logging_outputs)
-
-        agg_output = {
-            'loss': loss / sample_size / math.log(2),
-            'nll_loss': sum(log.get('nll_loss', 0) for log in logging_outputs) / sample_size / math.log(2) if ntokens > 0 else 0.,
-            'ntokens': ntokens,
-            'nsentences': nsentences,
-            'sample_size': sample_size,
-        }
-        return agg_output
+            
+            loss = loss + 0.1 * adv_loss
+        return loss, outputs, labels

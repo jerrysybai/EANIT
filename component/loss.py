@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from component.AT_model import AdvMaskedLmLoss
 
 class Loss(object):
     """
@@ -22,27 +23,29 @@ class Loss(object):
 
 class TargetLMLoss(Loss):
 
-    def __init__(self, ignore_index):
+    def __init__(self, args, ignore_index):
         super().__init__()
-        self.ignore_index = ignore_index
-        self.loss_fn = nn.CrossEntropyLoss(ignore_index=ignore_index)
+        # self.ignore_index = ignore_index
+        # self.loss_fn = nn.CrossEntropyLoss(ignore_index=ignore_index)
+        self.adv_loss = AdvMaskedLmLoss(args, ignore_index)
 
     def __call__(self, model, inputs, training_args, return_outputs=False, generation_config = None):
         input_ids = inputs['input_ids']
         attention_mask = inputs['attention_mask']
         target_mask = inputs['target_mask']
         if generation_config is None:
-            # 模型前馈预测
-            outputs = model(input_ids=input_ids, attention_mask=attention_mask, return_dict=True)
-            logits = outputs["logits"] if isinstance(outputs, dict) else outputs[0]
+            loss, outputs, labels = self.adv_loss(model, inputs)
+            # # 模型前馈预测
+            # outputs = model(input_ids=input_ids, attention_mask=attention_mask, return_dict=True)
+            # logits = outputs["logits"] if isinstance(outputs, dict) else outputs[0]
 
-            # 将labels中不属于target的部分，设为ignore_index，只计算target部分的loss
-            labels = torch.where(target_mask == 1, input_ids, self.ignore_index)
-            shift_logits = logits[..., :-1, :].contiguous()
-            shift_labels = labels[..., 1:].contiguous()
-            # Flatten the tokens
+            # # 将labels中不属于target的部分，设为ignore_index，只计算target部分的loss
+            # labels = torch.where(target_mask == 1, input_ids, self.ignore_index)
+            # shift_logits = logits[..., :-1, :].contiguous()
+            # shift_labels = labels[..., 1:].contiguous()
+            # # Flatten the tokens
             
-            loss = self.loss_fn(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+            # loss = self.loss_fn(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
             
         else: 
             test_input = inputs["test_ids"]

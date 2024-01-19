@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=6,7 python train_qlora.py --train_args_file train_args/qlora/NER3-sft-qlora.json

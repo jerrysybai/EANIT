@@ -105,7 +105,7 @@ class LlamaModel_NEFT(LlamaModel):
         self.post_init()
         
     
-    def new_func(self, x, noise_adv = None):
+    def new_func(self, x, noise_adv = None, noise_mask = None):
         # during training, we add noise to the embedding
         # during generation, we don't add noise to the embedding
         if self.training :
@@ -116,7 +116,7 @@ class LlamaModel_NEFT(LlamaModel):
                 # return embed_init + (torch.zeros_like(embed_init).uniform_(-mag_norm, mag_norm))
                 return embed_init
             else:
-                return embed_init + noise_adv
+                return embed_init + noise_adv * noise_mask.unsqueeze(-1).expand_as(noise_adv)
         else:
             return self.embed_tokens(x)
     
@@ -132,7 +132,8 @@ class LlamaModel_NEFT(LlamaModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-        noise_adv: Optional[torch.FloatTensor] = None
+        noise_adv: Optional[torch.FloatTensor] = None,
+        noise_mask: Optional[torch.LongTensor] = None
     ) -> Union[Tuple, BaseModelOutputWithPast]:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -170,7 +171,7 @@ class LlamaModel_NEFT(LlamaModel):
 
         if inputs_embeds is None:
             # inputs_embeds = self.embed_tokens(input_ids)
-            inputs_embeds = self.new_func(input_ids, noise_adv)
+            inputs_embeds = self.new_func(input_ids, noise_adv, noise_mask)
         # embed positions
         if attention_mask is None:
             attention_mask = torch.ones(
@@ -277,7 +278,8 @@ class AT_llama(LlamaForCausalLM):
         output_attentions = None,
         output_hidden_states = None,
         return_dict = None,
-        noise_adv = None
+        noise_adv = None,
+        noise_mask = None
     ) :
         r"""
         Args:
@@ -321,7 +323,8 @@ class AT_llama(LlamaForCausalLM):
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
-            noise_adv = noise_adv
+            noise_adv = noise_adv,
+            noise_mask = noise_mask
         )
 
         hidden_states = outputs[0]

@@ -77,17 +77,34 @@ class AdvMaskedLmLoss(object):
         loss, labels = self.get_loss(logits, target_mask, input_ids)
         
         if self.args.add_nosie:
+            # output = model(x)
+            # loss = get_loss(output, y)
+            
+                # class noise_restore->
+                # for i in model.layers:
+                    # if i is embedding_layer:
+                    #     加noise, store(embedding_layer.weight)
+                
+            # model = noise-restor(model).noise
+            # adv_loss = get_loss(model)
+            # adv_loss.backward()
+            # g = adv_loss.gradient
+            # model = noise_restore(model).restore
+            
+            # loss.backward()
+            
             #构建对抗样本
+            model.zero_grad()
             embed = outputs['hidden_states']
             dims = torch.tensor(input_ids.size(1) * 4096)
             mag_norm = 10/torch.sqrt(dims)
-            noise = embed.data.new(embed.size()).normal_(-mag_norm, mag_norm) * self.args.noise_var
+            noise = torch.zeros(embed.size()).uniform_(-mag_norm, mag_norm).to(input_ids.device) #* self.args.noise_var
             noise.requires_grad_() #噪声向量初始化
-            adv_outputs = model(input_ids=input_ids, attention_mask=attention_mask, return_dict=True, noise_adv = noise)
+            adv_outputs = model(input_ids=input_ids, attention_mask=attention_mask, return_dict=True, noise_adv = noise, noise_mask = inputs["ins_mask"])
             adv_logits = adv_outputs["logits"] if isinstance(adv_outputs, dict) else adv_outputs[0]
             adv_loss, _ = self.get_loss(adv_logits, target_mask.detach(), input_ids.detach()) if not self.args.useKL else KL(adv_logits, logits.detach(), noise_pos, normal_pos)
             
-            adv_loss.backward()
+            adv_loss.backward(retain_graph=True)
             delta_grad = noise.grad #对噪声向量计算梯度
             norm = delta_grad.norm()
             model.zero_grad()
@@ -99,10 +116,10 @@ class AdvMaskedLmLoss(object):
             new_noise = noise + (delta_grad / norm) * self.args.adv_step_size  #更新噪声向量
             # line 6 projection
             # new_noise = self.adv_project(noise, norm_type=self.args.project_norm_type, eps=self.args.noise_gamma)
-            adv_outputs = model(input_ids=input_ids, attention_mask=attention_mask, return_dict=True, noise_adv = new_noise) #再走一遍网络，一共走三遍
+            adv_outputs = model(input_ids=input_ids, attention_mask=attention_mask, return_dict=True, noise_adv = new_noise, noise_mask = inputs["ins_mask"]) #再走一遍网络，一共走三遍
             adv_logits = adv_outputs["logits"] if isinstance(adv_outputs, dict) else adv_outputs[0]
             adv_loss, _ = self.get_loss(adv_logits, target_mask, input_ids) if not self.args.useKL else KL(adv_logits, logits.detach(), noise_pos, normal_pos)
             # line 8 symmetric KL
             
-            loss = loss + 0.1 * adv_loss
+            loss = loss + 1.0 * adv_loss
         return loss, outputs, labels

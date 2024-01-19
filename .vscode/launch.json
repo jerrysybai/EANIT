@@ -11,10 +11,11 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": false,
-            "python":"/home/lqb/anaconda3/envs/llama/bin/python",
+            "python":"/home/baishengyuan/anaconda3/envs/nllm/bin/python",
             "args": ["--train_args_file",
                     "train_args/qlora/llama2-sft-qlora.json",
-                    ]
+                    ],
+            "env": {"CUDA_VISIBLE_DEVICES": "0"}
         }
     ]
 }

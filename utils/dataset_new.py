@@ -233,6 +233,13 @@ class SFTDataset(Dataset):
                 truncation=True,
             )
         
+        ins_len = len(self.tokenizer(
+                self.noise_instruction,
+                max_length=self.max_len,
+                padding=self.padding,
+                truncation=True,
+            )["input_ids"])
+        
         noise_inpts = self.tokenizer(
                 noise_instruction,
                 max_length=self.max_len,
@@ -279,7 +286,8 @@ class SFTDataset(Dataset):
             'noise_mask': noise_mask,
             'test_input': test_input_ids,
             'label_ids': tokenized_label,
-            'mention_pos':(len(tokenized_input)-1, len(tokenized_noise)-1)
+            'mention_pos':(len(tokenized_input)-1, len(tokenized_noise)-1),
+            "ins_len": ins_len
         }
         return inputs
 

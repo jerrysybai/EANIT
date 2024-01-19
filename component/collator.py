@@ -20,7 +20,7 @@ class SFTDataCollator(object):
         batch_max_labellen = min(max(label_len), self.max_seq_length)
         # batch_max_len = self.max_seq_length
 
-        input_ids_batch, attention_mask_batch, target_mask_batch, labels_batch, test_batch, normal_pos_batch, noise_pos_batch = [], [], [], [], [], [], []
+        input_ids_batch, attention_mask_batch, target_mask_batch, labels_batch, test_batch, normal_pos_batch, noise_pos_batch, ins_mask = [], [], [], [], [], [], [], []
         # truncate and padding
         for x in batch:
             input_ids = x['input_ids']
@@ -29,6 +29,7 @@ class SFTDataCollator(object):
             test_input = x["test_input"]
             label_ids = x["label_ids"]
             mention_pos = x["mention_pos"]
+            ins_len = x["ins_len"]
             
             normal_pos = [mention_pos[0] + i for i in range(len(label_ids))][:150]
             noise_pos = [mention_pos[1] + i for i in range(len(label_ids))][:150]
@@ -53,6 +54,7 @@ class SFTDataCollator(object):
             target_mask = target_mask[:self.max_seq_length]
             test_input = test_input[:self.max_seq_length]
             label_ids = label_ids[:self.max_seq_length]
+            ins = [1]*ins_len + [0] * (len(input_ids) - ins_len)
 
 
             input_ids_batch.append(input_ids)
@@ -62,6 +64,7 @@ class SFTDataCollator(object):
             test_batch.append(test_input)
             normal_pos_batch.append(normal_pos)
             noise_pos_batch.append(noise_pos)
+            ins_mask.append(ins)
 
         # 将list转换为tensor，得到最终的的模型输入
         input_ids_batch = torch.tensor(input_ids_batch, dtype=torch.long)
@@ -71,6 +74,7 @@ class SFTDataCollator(object):
         test_batch = torch.tensor(test_batch, dtype=torch.long)
         normal_batch = torch.tensor(normal_pos_batch, dtype=torch.long)
         noise_batch = torch.tensor(noise_pos_batch, dtype=torch.long)
+        ins_mask_batch = torch.tensor(ins_mask, dtype=torch.long)
         
         inputs = {
             'input_ids': input_ids_batch,
@@ -79,6 +83,7 @@ class SFTDataCollator(object):
             'test_labels':labels_batch,
             'test_ids':test_batch,
             'noise_pos' : noise_batch,
-            'normal_pos': normal_batch
+            'normal_pos': normal_batch,
+            'ins_mask':ins_mask_batch
         }
         return inputs

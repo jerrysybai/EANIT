@@ -4,3 +4,4 @@ output/llama_conll03*_noise
 data
 output
 origin_data
+log

@@ -1,5 +1,5 @@
 {
-    "output_dir": "/cto_labs/baishengyuan/noise_llm_data/output/llama_AT_onto_init_graph",
+    "output_dir": "/cto_labs/baishengyuan/noise_llm_data/output/llama_AT_ins_onto",
     "model_name_or_path": "/cto_labs/baishengyuan/noise_llm_data/Llama-7B",
     "train_file": "/cto_labs/baishengyuan/noise_llm_data/NER/Ontonotes",
     "eval_file":"data/test/NER/CoNLL 2003_sample_15000_test.json",

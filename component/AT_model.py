@@ -100,7 +100,7 @@ class AdvMaskedLmLoss(object):
             mag_norm = 10/torch.sqrt(dims)
             noise = torch.zeros(embed.size()).uniform_(-mag_norm, mag_norm).to(input_ids.device) #* self.args.noise_var
             noise.requires_grad_() #噪声向量初始化
-            adv_outputs = model(input_ids=input_ids, attention_mask=attention_mask, return_dict=True, noise_adv = noise, noise_mask = inputs["ins_mask"])
+            adv_outputs = model(input_ids=input_ids, attention_mask=attention_mask, return_dict=True, noise_adv = noise)#, noise_mask = inputs["ins_mask"]
             adv_logits = adv_outputs["logits"] if isinstance(adv_outputs, dict) else adv_outputs[0]
             adv_loss, _ = self.get_loss(adv_logits, target_mask.detach(), input_ids.detach()) if not self.args.useKL else KL(adv_logits, logits.detach(), noise_pos, normal_pos)
             
@@ -116,7 +116,7 @@ class AdvMaskedLmLoss(object):
             new_noise = noise + (delta_grad / norm) * self.args.adv_step_size  #更新噪声向量
             # line 6 projection
             # new_noise = self.adv_project(noise, norm_type=self.args.project_norm_type, eps=self.args.noise_gamma)
-            adv_outputs = model(input_ids=input_ids, attention_mask=attention_mask, return_dict=True, noise_adv = new_noise, noise_mask = inputs["ins_mask"]) #再走一遍网络，一共走三遍
+            adv_outputs = model(input_ids=input_ids, attention_mask=attention_mask, return_dict=True, noise_adv = new_noise)#, noise_mask = inputs["ins_mask"]) #再走一遍网络，一共走三遍
             adv_logits = adv_outputs["logits"] if isinstance(adv_outputs, dict) else adv_outputs[0]
             adv_loss, _ = self.get_loss(adv_logits, target_mask, input_ids) if not self.args.useKL else KL(adv_logits, logits.detach(), noise_pos, normal_pos)
             # line 8 symmetric KL

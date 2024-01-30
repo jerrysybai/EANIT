@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=6,7 python train_qlora.py --train_args_file train_args/qlora/NER3-sft-qlora.json
+CUDA_VISIBLE_DEVICES=2,3 python train_qlora.py --train_args_file /home/baishengyuan/project/noise_llm/code/tmp/AT_llama/train_args/qlora/NER-sft-qlora.json

@@ -1,3 +1,7 @@
+import os
+os.environ["ACCELERATE_BYPASS_DEVICE_MAP"] = "true" 
+# os.environ["WORLD_SIZE"] = "1"
+
 from transformers import AutoTokenizer, BitsAndBytesConfig
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from transformers import (
@@ -8,7 +12,6 @@ from transformers import (
 )
 import argparse
 from loguru import logger
-import os
 from os.path import join
 import torch
 import bitsandbytes as bnb
@@ -18,7 +21,8 @@ import numpy as np
 
 from component.collator import SFTDataCollator
 from component.dataset import  ChatGLM2SFTDataset
-from utils.dataset_new import SFTDataset, SFTDataset_all
+# from utils.dataset_new import SFTDataset, SFTDataset_all
+from utils.dataset_ins import SFTDataset
 from component.argument import QLoRAArguments
 from component.trainer import LoRATrainer
 from component.loss import TargetLMLoss
@@ -123,7 +127,8 @@ def init_components(args, training_args):
     if args.add_nosie:
         model = AT_llama.from_pretrained(
             args.model_name_or_path,
-            device_map=device_map,
+            # device_map={'':torch.cuda.current_device()},
+            device_map= device_map,
             # load_in_4bit=True,
             torch_dtype=torch.float16,
             quantization_config=BitsAndBytesConfig(
@@ -140,10 +145,10 @@ def init_components(args, training_args):
         model = AutoModelForCausalLM.from_pretrained(
             args.model_name_or_path,
             device_map=device_map,
-            load_in_4bit=True,
+            # load_in_8bit=True,
             torch_dtype=torch.float16,
             quantization_config=BitsAndBytesConfig(
-                load_in_4bit=True,
+                load_in_8bit=True,
                 bnb_4bit_compute_dtype=torch.float16,
                 bnb_4bit_use_double_quant=True,
                 bnb_4bit_quant_type="nf4",
@@ -175,8 +180,8 @@ def init_components(args, training_args):
     if model.config.model_type == 'chatglm':
         train_dataset = ChatGLM2SFTDataset(args.train_file, tokenizer, args.max_seq_length)
     else:
-        train_dataset = SFTDataset(args.train_file, tokenizer, args.max_seq_length, type = args.task)
-        eval_dataset = SFTDataset(args.train_file, tokenizer, args.max_seq_length, is_train = False, type = args.task)
+        train_dataset = SFTDataset(args.train_file, tokenizer, args.max_seq_length, is_train=True,type = args.task, noise_rate = args.noise_rate)
+        eval_dataset = SFTDataset(args.eval_file, tokenizer, args.max_seq_length, is_train=True, type = args.task, noise_rate = args.noise_rate)
     data_collator = SFTDataCollator(tokenizer, args.max_seq_length)
 
     # casts all the non int8 modules to full precision (fp32) for stability

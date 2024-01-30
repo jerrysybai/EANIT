@@ -116,7 +116,7 @@ class LlamaModel_NEFT(LlamaModel):
                 # return embed_init + (torch.zeros_like(embed_init).uniform_(-mag_norm, mag_norm))
                 return embed_init
             else:
-                return embed_init + noise_adv * noise_mask.unsqueeze(-1).expand_as(noise_adv)
+                return embed_init + noise_adv #* noise_mask.unsqueeze(-1).expand_as(noise_adv)
         else:
             return self.embed_tokens(x)
     

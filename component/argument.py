@@ -33,3 +33,5 @@ class QLoRAArguments:
     adv_step_size: Optional[float] = field(default=1e-3, metadata={"help": "1 (default), perturbation size for adversarial training."})
     project_norm_type: Optional[str] = field(default="inf", metadata={"help": "the task name RE/NER"})
     useKL: Optional[bool] = field(default=False, metadata={"help": "use KL"})
+    noise_rate: Optional[float] = field(default=0.8, metadata={"help": "noise rate"})
+    # local_rank: Optional[int] = field(default=2, metadata={"help": "lora alpha"})

@@ -13,9 +13,9 @@
             "justMyCode": false,
             "python":"/home/baishengyuan/anaconda3/envs/nllm/bin/python",
             "args": ["--train_args_file",
-                    "train_args/qlora/llama2-sft-qlora.json",
+                    "/home/baishengyuan/project/noise_llm/code/tmp/AT_llama/train_args/qlora/RE-sft-qlora.json",
                     ],
-            "env": {"CUDA_VISIBLE_DEVICES": "0"}
+            "env": {"CUDA_VISIBLE_DEVICES": "6,7"}
         }
     ]
 }

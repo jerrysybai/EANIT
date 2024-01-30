@@ -1,18 +1,0 @@
-nohup: ignoring input
-
-===================================BUG REPORT===================================
-Welcome to bitsandbytes. For bug reports, please run
-
-python -m bitsandbytes
-
- and submit this information together with your error trace to: https://github.com/TimDettmers/bitsandbytes/issues
-================================================================================
-bin /home/baishengyuan/anaconda3/envs/nllm/lib/python3.10/site-packages/bitsandbytes/libbitsandbytes_cuda118.so
-CUDA SETUP: CUDA runtime path found: /home/baishengyuan/anaconda3/envs/nllm/lib/libcudart.so.11.0
-CUDA SETUP: Highest compute capability among GPUs detected: 8.6
-CUDA SETUP: Detected CUDA version 118
-CUDA SETUP: Loading binary /home/baishengyuan/anaconda3/envs/nllm/lib/python3.10/site-packages/bitsandbytes/libbitsandbytes_cuda118.so...
-[2024-01-11 11:10:38,355] [INFO] [real_accelerator.py:110:get_accelerator] Setting ds_accelerator to cuda (auto detect)
-2024-01-11 11:10:50.019 | INFO     | __main__:init_components:107 - Initializing components...
-The argument `trust_remote_code` is to be used with Auto classes. It has no effect here and is ignored.
-Loading checkpoint shards:   0%|                                                                                                                                                             | 0/2 [00:00<?, ?it/s]

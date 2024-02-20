@@ -104,7 +104,7 @@ class AdvMaskedLmLoss(object):
             model.zero_grad()
             embed = outputs['hidden_states']
             dims = torch.tensor(input_ids.size(1) * 4096)
-            mag_norm = 10/torch.sqrt(dims)
+            mag_norm = self.args.beta/torch.sqrt(dims)
             noise = torch.zeros(embed.size()).uniform_(-mag_norm, mag_norm).to(input_ids.device) #* self.args.noise_var
             noise.requires_grad_() #噪声向量初始化
             adv_outputs = model(input_ids=input_ids, attention_mask=attention_mask, return_dict=True, noise_adv = noise)#, noise_mask = inputs["ins_mask"]

@@ -200,7 +200,7 @@ def init_components(args, training_args):
     )
     # model = get_peft_model(model, config)
     from peft import PeftModel
-    model = PeftModel.from_pretrained(model, '/cto_labs/baishengyuan/noise_llm_data/outputs_new/NER/random_replace_0.2_ins1/05-05-1e-3/checkpoint-4684').eval()
+    model = PeftModel.from_pretrained(model, '').eval()
     model.print_trainable_parameters()
     model.config.torch_dtype = torch.float32
 

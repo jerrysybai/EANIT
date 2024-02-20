@@ -1,5 +1,6 @@
 import os
 os.environ["ACCELERATE_BYPASS_DEVICE_MAP"] = "true" 
+# os.environ["TORCH_USE_CUDA_DSA"] = "1"
 # os.environ["WORLD_SIZE"] = "1"
 
 from transformers import AutoTokenizer, BitsAndBytesConfig
@@ -29,7 +30,7 @@ from component.loss import TargetLMLoss
 from component.llama_model import Llama_seq2seq
 from utils.metrics import get_metrics
 from utils.NEFT import AT_llama
-
+from peft import PeftModel
 
 def verify_model_dtype(model):
     """
@@ -180,7 +181,7 @@ def init_components(args, training_args):
     if model.config.model_type == 'chatglm':
         train_dataset = ChatGLM2SFTDataset(args.train_file, tokenizer, args.max_seq_length)
     else:
-        train_dataset = SFTDataset(args.train_file, tokenizer, args.max_seq_length, is_train=True,type = args.task, noise_rate = args.noise_rate)
+        train_dataset = SFTDataset(args.train_file, tokenizer, args.max_seq_length, is_train=True,type = args.task, noise_rate = args.noise_rate, sample_rate=args.sample_rate)
         eval_dataset = SFTDataset(args.eval_file, tokenizer, args.max_seq_length, is_train=True, type = args.task, noise_rate = args.noise_rate)
     data_collator = SFTDataCollator(tokenizer, args.max_seq_length)
 
@@ -198,7 +199,7 @@ def init_components(args, training_args):
         bias="none",
         task_type="CAUSAL_LM",
     )
-    model = get_peft_model(model, config)
+    model = get_peft_model(model, config) if args.sample_rate is None else  PeftModel.from_pretrained(model, args.pre_trainpath ,is_trainable=True)
     model.print_trainable_parameters()
     model.config.torch_dtype = torch.float32
 

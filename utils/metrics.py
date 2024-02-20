@@ -1,5 +1,6 @@
 import numpy as np
 from sklearn.metrics import f1_score, precision_score, recall_score
+import torch
 
 def get_metrics(tokenizer, type):
     
@@ -50,7 +51,8 @@ def get_metrics(tokenizer, type):
         r = cor_tot / ner_tot_recall 
         f1_tot = 2 * (p * r) / (p + r) if cor_tot > 0 else 0.0
         ad = {'f1':  f1_tot, 'precision': p, 'recall': r}
-        print(ad)    
+        print(ad)
+        torch.cuda.empty_cache()    
         return {'f1':  f1_tot, 'precision': p, 'recall': r}
     
     

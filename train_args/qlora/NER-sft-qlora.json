@@ -1,5 +1,5 @@
 {
-    "output_dir": "/cto_labs/baishengyuan/noise_llm_data/outputs_new/NER/random_replace_0.2_ins1/05-05-5e-3",
+    "output_dir": "/cto_labs/baishengyuan/noise_llm_data/outputs_new/NER/random_replace_0.2_ins1/conll03/08-08-1e-3",
     "model_name_or_path": "/cto_labs/baishengyuan/noise_llm_data/Llama-7B",
     "train_file": "/cto_labs/baishengyuan/adv_data/NER/conll03/random_replace_0.2_ins1/train.json",
     "eval_file":"/cto_labs/baishengyuan/adv_data/NER/conll03/random_replace_0.2_ins1/test.json",
@@ -19,8 +19,8 @@
     "lora_dropout": 0.05,
     "add_nosie": true,
     "task": "NER",
-    "adv_step_size":5e-3,
-    "noise_rate":0.5,
+    "adv_step_size":1e-3,
+    "noise_rate":0.8,
 
     "gradient_checkpointing": true,
     "disable_tqdm": false,

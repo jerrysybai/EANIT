@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from component.AT_model import AdvMaskedLmLoss
+from component.AT_model import AdvMaskedLmLoss, AdvMaskedLmLoss_2steps
 
 class Loss(object):
     """

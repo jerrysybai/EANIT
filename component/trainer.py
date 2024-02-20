@@ -245,7 +245,13 @@ class LoRATrainer(Trainer):
                     loss = None
                     with self.compute_loss_context_manager():
                         # outputs = model(**inputs)
-                        gen_kwargs = { "max_new_tokens":300, "top_p" : 0.9, "do_sample":True, "temperature" :0.35,"repetition_penalty" : 1.0,"eos_token_id":self.tokenizer.eos_token_id}
+                        # 
+                        gen_kwargs = {"max_new_tokens" : 300, 
+                                      "top_p" : 0.9, 
+                                      "do_sample" : True, 
+                                      "temperature" : 0.35,
+                                      "repetition_penalty" : 1.0,
+                                      "eos_token_id":self.tokenizer.eos_token_id}
                         generation_config = GenerationConfig(**gen_kwargs)
                         loss, outputs, labels= self.loss_func(model, inputs, self.args, return_outputs = True, generation_config = generation_config)
                     if isinstance(outputs, dict):

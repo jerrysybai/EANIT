@@ -6,8 +6,30 @@ import os
 import random
 from transformers import AutoTokenizer, BitsAndBytesConfig
 
+def levenshtein_distance(str1, str2):
+    len_str1 = len(str1) + 1
+    len_str2 = len(str2) + 1
+
+    # 初始化距离矩阵
+    matrix = [[0 for n in range(len_str2)] for m in range(len_str1)]
+
+    for i in range(len_str1):
+        matrix[i][0] = i
+
+    for j in range(len_str2):
+        matrix[0][j] = j
+
+    for i in range(1, len_str1):
+        for j in range(1, len_str2):
+            cost = 0 if str1[i - 1] == str2[j - 1] else 1
+            matrix[i][j] = min(matrix[i - 1][j] + 1,      # 删除
+                               matrix[i][j - 1] + 1,      # 插入
+                               matrix[i - 1][j - 1] + cost)  # 替换
+
+    return matrix[len_str1 - 1][len_str2 - 1]/len_str1
+
 class SFTDataset(Dataset):
-    def __init__(self, path, tokenizer, max_seq_length, is_train = True, type = "NER", noise_rate = 0.8):
+    def __init__(self, path, tokenizer, max_seq_length, is_train = True, type = "NER", noise_rate = 0.8, sample_rate = None):
         self.type = type
         self.tokenizer = tokenizer
         self.bos_token_id = tokenizer.bos_token_id
@@ -21,6 +43,8 @@ class SFTDataset(Dataset):
         logger.info('Loading data: {}'.format(path))
         with open(path, encoding="utf-8") as f:
             self.example = json.load(f)
+        if sample_rate is not None:
+            self.example = self.example[:int(len(self.example) * sample_rate)]
         logger.info("there are {} data in dataset".format(len(self.example)))
            
     def __len__(self):

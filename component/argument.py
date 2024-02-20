@@ -34,4 +34,6 @@ class QLoRAArguments:
     project_norm_type: Optional[str] = field(default="inf", metadata={"help": "the task name RE/NER"})
     useKL: Optional[bool] = field(default=False, metadata={"help": "use KL"})
     noise_rate: Optional[float] = field(default=0.8, metadata={"help": "noise rate"})
+    sample_rate: Optional[float] = field(default=None, metadata={"help": "sample rate"})
+    pre_trainpath: Optional[str] = field(default="", metadata={"help": "the pretrain model path"})
     # local_rank: Optional[int] = field(default=2, metadata={"help": "lora alpha"})

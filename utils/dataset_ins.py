@@ -127,16 +127,3 @@ class SFTDataset(Dataset):
             # "ins_len": ins_len
         }
         return inputs
-
-
-
-
-# tokenizer = AutoTokenizer.from_pretrained(
-#         "/cto_labs/baishengyuan/noise_llm_data/Llama-7B",
-#         trust_remote_code=True,
-#         # llama不支持fast
-#         use_fast=False
-#     )
-# tokenizer.pad_token_id = tokenizer.eos_token_id if tokenizer.pad_token_id is None else tokenizer.pad_token_id
-# a = SFTDataset("/home/baishengyuan/project/noise_llm/code/noise_dataset/train.json", tokenizer, 512)
-# a(1)
